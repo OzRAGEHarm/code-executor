@@ -40,7 +40,9 @@ app.post('/run-code', (req, res) => {
             activeProcess = spawn('python', ['-c', code]);
         } else if (language === 'javascript') {
             activeProcess = spawn('node', ['-e', code]);
-        } else {
+        } else if (language === 'c#') {
+            activeProcess = spawn('dotnet', ['run', code]);
+        }else {
             res.status(400).json({ error: 'Unsupported language' });
             return;
         }

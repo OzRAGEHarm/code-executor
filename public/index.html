@@ -62,6 +62,15 @@
         #save-button {
             margin-top: 10px;
         }
+
+        /* Style for the Folder Dropdown Menu */
+        .dropdown-menu {
+            position: absolute;
+            background-color: white;
+            border: 1px solid black;
+            padding: 10px;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -75,6 +84,7 @@
     <select id="language" onchange="languageChanged()">
         <option value="python">Python</option>
         <option value="javascript">JavaScript</option>
+        <option value="c#">C#</option>
     </select><br>
     <div class="input-container"> <!-- Added a container for the buttons -->
         <button onclick="runCode()">Run Code</button>
@@ -88,312 +98,9 @@
         <!-- For files and folders in the selected folder -->
         <h2>Files in folder:</h2>
         <div id="folder-contents"></div>
-        <div id="file-list"></div>
+        <div id="file-list" class="dropdown-menu"></div>
     </div>    
 
-    <script>
-        let editedFile = null; // Store the edited file content
-        let originalCode = ''; // Store the original code
-        let selectedFolder = null; // Store the selected folder
-        let selectedFile = null; // Store the selected file
-
-        // Map to keep track of changes in files
-        const fileChanges = new Map();
-
-        var inps = document.querySelectorAll('input');
-        [].forEach.call(inps, function(inp) {
-            inp.onchange = function(e) {
-                for (let i = 0; i < this.files.length; i++) {
-                    const fileButton = document.createElement("button");
-                    const fileName = this.files[i].name;
-                    fileButton.textContent = fileName;
-                    fileButton.className = "file-button";
-                    fileButton.addEventListener("click", () => {
-                        // When a file is clicked, display its contents
-                        viewFile(this.files[i]);
-                    });
-                    const fileListContainer = document.getElementById("file-list");
-                    fileListContainer.appendChild(fileButton);
-
-                    // Create an entry for the file in the changes map
-                    fileChanges.set(fileName, {
-                        content: null,
-                        changed: false,
-                    });
-                }
-            };
-        });
-        
-        async function handleDirectorySelect() {
-            const fileInput = document.getElementById("file");
-            const selectedFileName = document.getElementById("selected-file-name");
-            const languageSelect = document.getElementById("language");
-
-            if (fileInput.files.length > 0) {
-                // Clear code textarea when a folder is selected
-                document.getElementById("code").value = "";
-                originalCode = "";
-                editedFile = null;
-
-                // Clear folder contents
-                document.getElementById("folder-contents").innerHTML = "";
-
-                // Loop through each selected folder
-                for (const folder of fileInput.files) {
-                    selectedFolder = folder;
-                    selectedFileName.textContent = `Selected Folder: ${fileInput.files[0].webkitRelativePath.split('/')[0]}`;
-
-                    // Display the file explorer for the selected folder
-                    await listFiles(folder);
-                }
-
-                // Upload the selected folder to the server
-                uploadFolderToServer(fileInput.files);
-            } else {
-                selectedFileName.textContent = "";
-                selectedFolder = null;
-                document.getElementById("file-list").innerHTML = "";
-                document.getElementById("folder-contents").innerHTML = "";
-            }
-        }
-
-        async function uploadFolderToServer(files) {
-            try {
-                const formData = new FormData();
-
-                for (const file of files) {
-                    formData.append("files", file);
-                }
-
-                const response = await fetch("/upload-folder", {
-                    method: "POST",
-                    body: formData,
-                });
-
-                if (response.ok) {
-                    console.log("Folder uploaded to server successfully.");
-                } else {
-                    console.error("Failed to upload folder to server.");
-                }
-            } catch (error) {
-                console.error("Error uploading folder to server:", error);
-            }
-        }
-
-        function saveFileChanges(fileName) {
-            if (fileName) {
-                const fileChange = fileChanges.get(fileName);
-
-                if (fileChange && fileChange.changed) {
-                    const newContent = document.getElementById("code").value;
-
-                    // Update the editedFile and changes map
-                    editedFile = newContent;
-                    fileChange.content = newContent;
-                    fileChange.changed = false;
-
-                    // Send the modified content to the server to save it
-                    saveModifiedContentOnServer(fileName, newContent);
-                }
-            }
-        }
-
-        async function saveModifiedContentOnServer(fileName, content) {
-            try {
-                const formData = new FormData();
-                formData.append("fileName", fileName);
-                formData.append("content", content);
-
-                const response = await fetch("/save-file", {
-                    method: "POST",
-                    body: formData,
-                });
-
-                if (response.ok) {
-                    console.log(`Changes for file "${fileName}" saved on the server.`);
-                    
-                    // After saving changes, update the "Files in folder" section
-                    updateFolderContents();
-                } else {
-                    console.error(`Failed to save changes for file "${fileName}" on the server.`);
-                }
-            } catch (error) {
-                console.error(`Error saving changes for file "${fileName}" on the server:`, error);
-            }
-        }
-
-        async function updateFolderContents() {
-            try {
-                const response = await fetch("/list-files", {
-                    method: "GET",
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    const fileListContainer = document.getElementById("file-list");
-                    fileListContainer.innerHTML = ""; // Clear the file list
-
-                    // Add the updated file list to the "Files in folder" section
-                    for (const fileName of data.files) {
-                        const fileButton = document.createElement("button");
-                        fileButton.textContent = fileName;
-                        fileButton.className = "file-button";
-                        fileButton.addEventListener("click", () => {
-                            // When a file is clicked, display its contents
-                            viewFile(fileName);
-                        });
-                        fileListContainer.appendChild(fileButton);
-
-                        // Create an entry for the file in the changes map
-                        fileChanges.set(fileName, {
-                            content: null,
-                            changed: false,
-                        });
-                    }
-                } else {
-                    console.error("Failed to update folder contents from the server.");
-                }
-            } catch (error) {
-                console.error("Error updating folder contents from the server:", error);
-            }
-        }
-
-        async function listFiles(directory) {
-            const fileListContainer = document.getElementById("file-list");
-            const folderContentsContainer = document.getElementById("folder-contents");
-            fileListContainer.innerHTML = "";
-            folderContentsContainer.innerHTML = "";
-
-            // Request read access to the directory using the File System Access API
-            try {
-                const dirHandle = await window.showDirectoryPicker({
-                    startIn: directory
-                });
-
-                for await (const [name, entry] of dirHandle) {
-                    if (entry.kind === "file") {
-                        const fileName = entry.name;
-                        const fileButton = document.createElement("button");
-                        fileButton.textContent = fileName;
-                        fileButton.className = "file-button";
-                        fileButton.addEventListener("click", () => {
-                            // When a file is clicked, display its contents
-                            viewFile(entry);
-                        });
-                        fileListContainer.appendChild(fileButton);
-
-                        // Create an entry for the file in the changes map
-                        fileChanges.set(fileName, {
-                            content: null,
-                            changed: false,
-                        });
-                    } else if (entry.kind === "directory") {
-                        const folderName = entry.name;
-                        const folderButton = document.createElement("button");
-                        folderButton.textContent = folderName;
-                        folderButton.className = "folder-button";
-                        folderButton.addEventListener("click", () => {
-                            // When a folder is clicked, list its contents
-                            listFiles(entry);
-                        });
-                        folderContentsContainer.appendChild(folderButton);
-                    }
-                }
-            } catch (error) {
-                console.error("Error accessing directory:", error);
-            }
-        }
-
-        function viewFile(fileEntry) {
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                const codeTextarea = document.getElementById("code");
-                codeTextarea.value = event.target.result;
-                originalCode = event.target.result; // Store the original code
-                editedFile = event.target.result; // Store the edited file content
-                selectedFile = fileEntry;
-
-                // Update the changes map
-                fileChanges.set(fileEntry.name, {
-                    content: event.target.result,
-                    changed: false,
-                });
-
-                // Show the Save button or update it
-                showSaveButton(fileEntry.name);
-            };
-            reader.readAsText(fileEntry);
-        }
-
-        function runCode() {
-            const code = document.getElementById("code").value;
-            const language = document.getElementById("language").value;
-
-            // Clear previous console output
-            const consoleOutputElement = document.getElementById("console-output");
-            consoleOutputElement.innerHTML = '';
-
-            // Override console.log to redirect its output
-            const originalConsoleLog = console.log;
-            console.log = function(message) {
-                originalConsoleLog.apply(console, arguments); // Output to the browser console
-                const consoleOutputElement = document.getElementById("console-output");
-                consoleOutputElement.innerHTML += message + '<br>'; // Output to the HTML page
-            };
-
-            fetch("/run-code", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ code, language }),
-            })
-            .then(response => response.json())
-            .then(data => {
-                const outputElement = document.getElementById("output");
-                outputElement.textContent = data.output || data.error;
-            })
-            .catch(error => {
-                console.error("Error:", error);
-            });
-        }
-
-        function runCommand() {
-            const command = document.getElementById("shell").value;
-            
-            fetch("/run-command", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ command }),
-            })
-            .then(response => response.json())
-            .then(data => {
-                const outputElement = document.getElementById("output");
-                outputElement.textContent = data.output || data.error;
-                document.getElementById("shell").value = '';
-            })
-            .catch(error => {
-                console.error("Error:", error);
-            });
-        }
-
-        function showSaveButton(fileName) {
-            const saveButton = document.createElement("button");
-            saveButton.textContent = "Save Changes";
-            saveButton.id = "save-button";
-            saveButton.addEventListener("click", () => {
-                saveFileChanges(fileName);
-            });
-            const fileListContainer = document.getElementById("file-list");
-
-            // Check if a Save button already exists for the file
-            const existingSaveButton = document.getElementById("save-button");
-            if (!existingSaveButton) {
-                fileListContainer.appendChild(saveButton);
-            }
-        }
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
