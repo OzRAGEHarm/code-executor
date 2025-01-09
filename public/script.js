@@ -267,9 +267,6 @@ function runCode() {
     const code = document.getElementById("code").value;
     const language = document.getElementById("language").value;
 
-    const outputElement = document.getElementById("output");
-    outputElement.textContent = language;
-
     // Clear previous console output
     const consoleOutputElement = document.getElementById("console-output");
     consoleOutputElement.innerHTML = '';

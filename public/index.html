@@ -84,7 +84,6 @@
     <select id="language" onchange="languageChanged()">
         <option value="python">Python</option>
         <option value="javascript">JavaScript</option>
-        <option value="c#">C#</option>
     </select><br>
     <div class="input-container"> <!-- Added a container for the buttons -->
         <button onclick="runCode()">Run Code</button>
@@ -102,5 +101,69 @@
     </div>    
 
     <script src="script.js"></script>
+
+<script>
+// Get the code input element
+const codeInput = document.getElementById('code');
+
+// Create a map of opening and closing symbols
+const symbolMap = {
+  '(': ')',
+  '{': '}',
+  '[': ']',
+  '"': '"',
+  "'": "'"
+};
+
+// Add an event listener to listen for keydown events
+codeInput.addEventListener('keydown', (event) => {
+  // Check if the key pressed is an opening symbol
+  const openingSymbol = symbolMap[event.key];
+  if (openingSymbol) {
+    // Get the cursor position
+    const cursorPosition = codeInput.selectionStart;
+
+    // Insert the opening symbol at the cursor position
+    codeInput.value = codeInput.value.substring(0, cursorPosition) + event.key + codeInput.value.substring(cursorPosition);
+
+    // Move the cursor after the opening symbol
+    codeInput.setSelectionRange(cursorPosition + 1, cursorPosition + 1);
+
+    // Prevent the default behavior of the event
+    event.preventDefault();
+  }
+});
+
+// Add an event listener to listen for keyup events
+codeInput.addEventListener('keyup', (event) => {
+  // Check if the key pressed is a delete or backspace key
+  if (event.keyCode === 46 || event.keyCode === 8) {
+    // Get the cursor position
+    const cursorPosition = codeInput.selectionStart;
+
+    // Check if the cursor is at the beginning of the code input
+    if (cursorPosition === 0) {
+      return;
+    }
+
+    // Get the character before the cursor
+    const previousCharacter = codeInput.value[cursorPosition - 1];
+
+    // If the previous character is an opening symbol, delete the opening and closing symbols
+    if (symbolMap[previousCharacter]) {
+      // Get the character after the cursor
+      const nextCharacter = codeInput.value[cursorPosition];
+
+      // If the next character is the closing symbol for the previous character, delete both the opening and closing symbols
+      if (nextCharacter === symbolMap[previousCharacter]) {
+        codeInput.value = codeInput.value.substring(0, cursorPosition - 1) + codeInput.value.substring(cursorPosition + 1);
+
+        // Place the cursor at the same position
+        codeInput.setSelectionRange(cursorPosition - 1, cursorPosition - 1);
+      }
+    }
+  }
+});
+</script>
 </body>
 </html>

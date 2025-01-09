@@ -26,6 +26,7 @@ if (!fs.existsSync(directoryPath)) {
     fs.mkdirSync(directoryPath);
 }
 
+// Request to actually execute the code
 app.post('/run-code', (req, res) => {
     try {
         const code = req.body.code;
@@ -40,8 +41,6 @@ app.post('/run-code', (req, res) => {
             activeProcess = spawn('python', ['-c', code]);
         } else if (language === 'javascript') {
             activeProcess = spawn('node', ['-e', code]);
-        } else if (language === 'c#') {
-            activeProcess = spawn('dotnet', ['run', code]);
         }else {
             res.status(400).json({ error: 'Unsupported language' });
             return;
@@ -74,6 +73,7 @@ app.post('/run-code', (req, res) => {
     }
 });
 
+// Request to run the cli command for the given code
 app.post('/run-command', (req, res) => {
     try {
         const command = req.body.command;
@@ -115,7 +115,7 @@ app.post('/run-command', (req, res) => {
 // Handle folder upload
 /*app.post('/upload-folder', (req, res) => {
     try {
-        const uploadedFiles = req.files.files; // Assuming you're using Express file handling middleware
+        const uploadedFiles = req.files.files;
 
         // Iterate over uploaded files and save them to the "uploads" directory
         uploadedFiles.forEach((file) => {
